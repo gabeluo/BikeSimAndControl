@@ -25,6 +25,13 @@ class Input:
     a: float
 
 
+@dataclass
+class Point:
+    x: float
+    y: float
+    theta: float
+
+
 class State(Enum):
     x = 0
     x_dot = 1
@@ -35,13 +42,12 @@ class State(Enum):
 
 
 class Simulation:
-    def __init__(self, inputs: Input, bike: Bike, time_step=0.001):
+    def __init__(self, bike: Bike, time_step=0.001):
         self.time_step = time_step
-        inputs.delta = radians(inputs.delta)
-        self.inputs = inputs
         self.bike = bike
         # (x, x_dot, y, y_dot, psi, psi_dot)
         self.states = np.zeros([6, 1])
+        self.states[State.x_dot.value][-1] = 0.1
         # (X, Y) (inertial frame, used for plotting)
         self.inertial_states = np.zeros([2, 1])
 
@@ -63,7 +69,7 @@ class Simulation:
             ]
         )
 
-    def update(self, time: int, inputs: Input):
+    def update(self, inputs: Input):
         # get the new z_dot values
         z_dot = self.find_z_dot(-1, inputs)
 
@@ -73,7 +79,7 @@ class Simulation:
             axis=1,
         )
 
-        Z_dot = self.find_Z_dot(time - 1)
+        Z_dot = self.find_Z_dot(-1)
 
         # update the inertial state variables
         self.inertial_states = np.concatenate(
@@ -84,10 +90,17 @@ class Simulation:
             axis=1,
         )
 
-    def simulate(self, sim_time: int):
+    def get_current_state(self):
+        return Point(
+            self.inertial_states[0][-1],
+            self.inertial_states[1][-1],
+            self.states[State.psi.value][-1],
+        )
+
+    def simulate(self, sim_time: int, inputs: Input):
         counter = 0
         while counter < sim_time / self.time_step - 1:
-            self.update(int(counter), self.inputs)
+            self.update(inputs)
             counter += 1
 
     def plot(self):
@@ -104,7 +117,8 @@ class Simulation:
         plt.plot(self.inertial_states[0], self.inertial_states[1], color="blue")
 
         # plot the markers
-        MARKER_FREQ = int(1 / self.time_step / 2)
+        MARKER_FREQ = 1 / self.time_step // 2
+        # MARKER_FREQ = 1
         for i in range(len(self.inertial_states[0])):
             if i % MARKER_FREQ == 0:
                 plt.plot(
@@ -125,8 +139,8 @@ class Simulation:
 
 
 class DynamicSim(Simulation):
-    def __init__(self, inputs: Input, bike: Bike, time_step: float):
-        super().__init__(inputs, bike, time_step)
+    def __init__(self, bike: Bike, time_step: float):
+        super().__init__(bike, time_step)
 
     # Calculate the z_dot values for the state variables
     def find_z_dot(self, time: int, inputs: Input):
@@ -181,7 +195,7 @@ class DynamicSim(Simulation):
 
 
 def main():
-    inputs = Input(delta=5, a=1)
+    inputs = Input(delta=radians(5), a=1)
     bike = Bike(
         front_corner_stiff=6000,
         rear_corner_stiff=6000,
@@ -190,8 +204,8 @@ def main():
         front_length=1,
         rear_length=1,
     )
-    simulation = DynamicSim(inputs=inputs, bike=bike, time_step=0.001)
-    simulation.simulate(sim_time=30)
+    simulation = DynamicSim(bike=bike, time_step=0.001)
+    simulation.simulate(sim_time=30, inputs=inputs)
     simulation.plot()
 
 
