@@ -2,22 +2,36 @@ from simulation import Input, Point
 from math import sqrt, atan2, pi
 
 
-# This is only for a point controller implementation
-class Controller:
-    def __init__(self, klp=0.001, kap=1.0, ki=0.0, kd=0.0):
-        self.klp = klp
-        self.kap = kap
+class PID:
+    def __init__(self, kp, ki, kd, time_step):
+        self.kp = kp
         self.ki = ki
         self.kd = kd
+        self.integral = 0
+        self.e_prev = 0
+        self.time_step = time_step
+
+    def update(self, error):
+        self.integral = self.integral + self.ki * error * self.time_step
+        error_dot = (error - self.e_prev) / self.time_step
+        self.e_prev = error
+        return self.kp * error + self.integral + self.kd * error_dot
+
+
+# This is only for a point controller implementation
+class Controller:
+    def __init__(
+        self, klp=0.001, kap=1.0, kli=0.0, kai=0.0, kld=0.0, kad=0.0, time_step=0.001
+    ):
+        self.linear_PID = PID(klp, kli, kld, time_step)
+        self.angular_PID = PID(kap, kai, kad, time_step)
 
     def new_inputs(self, current_pose, goal_pose):
         linear_error = self.linear_error(current_pose, goal_pose)
         angular_error = self.angular_error(current_pose, goal_pose)
 
-        # print(linear_error, angular_error)
-
-        a = self.klp * linear_error
-        delta = self.kap * angular_error
+        a = self.linear_PID.update(linear_error)
+        delta = self.angular_PID.update(angular_error)
 
         return Input(delta, a)
 

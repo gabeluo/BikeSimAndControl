@@ -5,7 +5,10 @@ from simulation import DynamicSim, Bike, Point
 
 def main(args=None):
     reach_threshold = 0.01
-    controller = Controller(1.1, 2.0, 0, 0)
+    time_step = 0.001
+    controller = Controller(
+        klp=1.1, kap=2.0, kli=0, kai=0, kld=0, kad=0, time_step=time_step
+    )
     bike = Bike(
         front_corner_stiff=6000,
         rear_corner_stiff=6000,
@@ -14,7 +17,7 @@ def main(args=None):
         front_length=1,
         rear_length=1,
     )
-    simulation = DynamicSim(bike=bike, time_step=0.001)
+    simulation = DynamicSim(bike=bike, time_step=time_step)
     goal_point = Point(args.x, args.y, args.theta)
 
     time_multiple = 0
