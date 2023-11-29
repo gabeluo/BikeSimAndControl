@@ -1,28 +1,40 @@
 import argparse
 from controller import Controller
-from simulation import DynamicSim, Bike, Point
+from simulation import DynamicSim, KinematicSim, Bike, Point
 
 
 def main(args=None):
     reach_threshold = 0.01
     time_step = 0.001
+    # Dynamic Controller (use default x and y position)
+    # controller = Controller(
+    #     klp=1.1, kap=2.0, kli=0, kai=0, kld=0, kad=0, time_step=time_step
+    # )
+    # Kinematic Controller (use 5, 10 for x and y)
     controller = Controller(
-        klp=1.1, kap=2.0, kli=0, kai=0, kld=0, kad=0, time_step=time_step
+        klp=1.0, kap=10.0, kli=0, kai=0, kld=0, kad=0, time_step=time_step
     )
     bike = Bike(
         front_corner_stiff=6000,
         rear_corner_stiff=6000,
         mass=1235,
         inertia=2200,
-        front_length=1,
-        rear_length=1,
+        front_length=0.5,
+        rear_length=0.5,
     )
-    simulation = DynamicSim(bike=bike, time_step=time_step)
+    if args.sim == "dynamic":
+        simulation = DynamicSim(bike=bike, time_step=time_step)
+    elif args.sim == "kinematic":
+        simulation = KinematicSim(bike=bike, time_step=time_step)
+    else:
+        print("This simulation type does not exist.")
+        return
+
     goal_point = Point(args.x, args.y, args.theta)
 
     time_multiple = 0
 
-    while time_multiple < 10000:
+    while time_multiple < 3 * 10**4:
         reached_goal = (
             True
             if controller.linear_error(simulation.get_current_state(), goal_point)
@@ -52,7 +64,8 @@ if __name__ == "__main__":
     argParser.add_argument("--x", type=float, default=1)
     argParser.add_argument("--y", type=float, default=1)
     argParser.add_argument("--theta", type=float, default=0)
+    argParser.add_argument("--sim", type=str, default="dynamic")
 
     args = argParser.parse_args()
 
-    main(args)
+    # main(args)

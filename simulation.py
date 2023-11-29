@@ -1,9 +1,8 @@
 # inputs is [front_steering_angle, a]
 
 import matplotlib.pyplot as plt
-from enum import Enum
 from dataclasses import dataclass
-from math import cos, sin, radians, degrees
+from math import cos, sin, tan, radians, degrees, atan
 import numpy as np
 from matplotlib.transforms import Affine2D
 from matplotlib.markers import MarkerStyle
@@ -71,11 +70,23 @@ class DynamicStates:
         return self
 
 
-@dataclass
 class KinematicStates:
-    x: float
-    y: float
-    psi: float
+    def __init__(
+        self,
+        x: float,
+        y: float,
+        psi: float,
+        v: float,
+    ):
+        self.x = x
+        self.y = y
+        self.psi = psi
+        self.v = v
+
+    def update_states(self, z_dot):
+        return KinematicStates(
+            self.x + z_dot[0], self.y + z_dot[1], self.psi + z_dot[2], self.v + z_dot[3]
+        )
 
 
 class Simulation:
@@ -83,68 +94,11 @@ class Simulation:
         self.time_step = time_step
         self.bike = bike
 
-    def update(self, inputs: Input):
-        # get the new z_dot values
-        z_dot = self.find_z_dot(inputs)
-
-        # update the state variables
-        self.states.append(self.states[-1].update_states(z_dot * self.time_step))
-
-        Z_dot = self.find_Z_dot()
-
-        self.states[-1] = self.states[-1].update_inertial_states(Z_dot * self.time_step)
-        # update the inertial state variables
-
-    def get_current_state(self):
-        return Point(
-            self.states[-1].X,
-            self.states[-1].Y,
-            self.states[-1].psi,
-        )
-
     def simulate(self, sim_time: int, inputs: Input):
         counter = 0
         while counter < sim_time / self.time_step - 1:
             self.update(inputs)
             counter += 1
-
-    def plot(self):
-        marker_colors = dict(
-            markersize=10,
-            markerfacecolor="red",
-            markerfacecoloralt="lightsteelblue",
-            markeredgecolor="brown",
-        )
-        plt.title("Robot Trajectory")
-        plt.xlabel("X [m]")
-        plt.ylabel("Y [m]")
-        # plot the path
-        plt.plot(
-            [state.X for state in self.states],
-            [state.Y for state in self.states],
-            color="blue",
-        )
-
-        # plot the markers
-        MARKER_FREQ = 1 / self.time_step // 2
-        # MARKER_FREQ = 1
-        for i in range(len(self.states)):
-            if i % MARKER_FREQ == 0:
-                plt.plot(
-                    self.states[i].X,
-                    self.states[i].Y,
-                    marker=MarkerStyle(
-                        "d",
-                        transform=Affine2D().rotate_deg(
-                            degrees(self.states[i].psi) - 90
-                        ),
-                        capstyle="round",
-                    ),
-                    **marker_colors
-                )
-
-        # show plot
-        plt.show()
 
 
 class DynamicSim(Simulation):
@@ -152,6 +106,13 @@ class DynamicSim(Simulation):
         super().__init__(bike, time_step)
         # (x, x_dot, y, y_dot, psi, psi_dot, X, Y)
         self.states = [DynamicStates(0, 0.1, 0, 0, 0, 0, initial_x, initial_y)]
+
+    def get_current_state(self):
+        return Point(
+            self.states[-1].X,
+            self.states[-1].Y,
+            self.states[-1].psi,
+        )
 
     # Calculate the z_dot values for the state variables
     def find_z_dot(self, inputs: Input):
@@ -194,6 +155,133 @@ class DynamicSim(Simulation):
             ]
         )
 
+    def update(self, inputs: Input):
+        # get the new z_dot values
+        z_dot = self.find_z_dot(inputs)
+
+        # update the state variables
+        self.states.append(self.states[-1].update_states(z_dot * self.time_step))
+
+        Z_dot = self.find_Z_dot()
+
+        # update the inertial state variables
+        self.states[-1] = self.states[-1].update_inertial_states(Z_dot * self.time_step)
+
+    def plot(self):
+        marker_colors = dict(
+            markersize=10,
+            markerfacecolor="red",
+            markerfacecoloralt="lightsteelblue",
+            markeredgecolor="brown",
+        )
+        plt.title("Dynamic Robot Trajectory")
+        plt.xlabel("X [m]")
+        plt.ylabel("Y [m]")
+        # plot the path
+        plt.plot(
+            [state.X for state in self.states],
+            [state.Y for state in self.states],
+            color="blue",
+        )
+
+        # plot the markers
+        MARKER_FREQ = 1 / self.time_step // 2
+        # MARKER_FREQ = 1
+        for i in range(len(self.states)):
+            if i % MARKER_FREQ == 0:
+                plt.plot(
+                    self.states[i].X,
+                    self.states[i].Y,
+                    marker=MarkerStyle(
+                        "d",
+                        transform=Affine2D().rotate_deg(
+                            degrees(self.states[i].psi) - 90
+                        ),
+                        capstyle="round",
+                    ),
+                    **marker_colors
+                )
+
+        # show plot
+        plt.show()
+
+
+class KinematicSim(Simulation):
+    def __init__(self, bike: Bike, time_step: float, initial_x=0, initial_y=0):
+        super().__init__(bike, time_step)
+        # (x, x_dot, y, y_dot, psi, psi_dot, X, Y)
+        self.states = [KinematicStates(initial_x, initial_y, 0, 0)]
+
+    def get_current_state(self):
+        return Point(
+            self.states[-1].x,
+            self.states[-1].y,
+            self.states[-1].psi,
+        )
+
+    # Calculate the z_dot values for the state variables
+    def find_z_dot(self, inputs: Input):
+        beta = atan(
+            self.bike.rear_length
+            / (self.bike.front_length + self.bike.rear_length)
+            * tan(inputs.delta)
+        )
+
+        # calculate the current z_dot
+        return np.array(
+            [
+                self.states[-1].v * cos(self.states[-1].psi + beta),
+                self.states[-1].v * sin(self.states[-1].psi + beta),
+                self.states[-1].v / self.bike.front_length * sin(beta),
+                inputs.a,
+            ]
+        )
+
+    def update(self, inputs: Input):
+        # get the new z_dot values
+        z_dot = self.find_z_dot(inputs)
+
+        # update the state variables
+        self.states.append(self.states[-1].update_states(z_dot * self.time_step))
+
+    def plot(self):
+        marker_colors = dict(
+            markersize=10,
+            markerfacecolor="red",
+            markerfacecoloralt="lightsteelblue",
+            markeredgecolor="brown",
+        )
+        plt.title("Kinematic Robot Trajectory")
+        plt.xlabel("X [m]")
+        plt.ylabel("Y [m]")
+        # plot the path
+        plt.plot(
+            [state.x for state in self.states],
+            [state.y for state in self.states],
+            color="blue",
+        )
+
+        # plot the markers
+        MARKER_FREQ = 1 / self.time_step // 2
+        # MARKER_FREQ = 1
+        for i in range(len(self.states)):
+            if i % MARKER_FREQ == 0:
+                plt.plot(
+                    self.states[i].x,
+                    self.states[i].y,
+                    marker=MarkerStyle(
+                        "d",
+                        transform=Affine2D().rotate_deg(
+                            degrees(self.states[i].psi) - 90
+                        ),
+                        capstyle="round",
+                    ),
+                    **marker_colors
+                )
+
+        # show plot
+        plt.show()
+
 
 def main():
     inputs = Input(delta=radians(5), a=1)
@@ -205,9 +293,13 @@ def main():
         front_length=1,
         rear_length=1,
     )
-    simulation = DynamicSim(bike=bike, time_step=0.001)
-    simulation.simulate(sim_time=30, inputs=inputs)
-    simulation.plot()
+    dynamic_simulation = DynamicSim(bike=bike, time_step=0.001)
+    dynamic_simulation.simulate(sim_time=30, inputs=inputs)
+    dynamic_simulation.plot()
+
+    kinematic_simulation = KinematicSim(bike=bike, time_step=0.001)
+    kinematic_simulation.simulate(sim_time=15, inputs=inputs)
+    kinematic_simulation.plot()
 
 
 if __name__ == "__main__":
