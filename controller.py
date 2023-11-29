@@ -1,5 +1,4 @@
-from simulation import State, Input, Point
-from dataclasses import dataclass
+from simulation import Input, Point
 from math import sqrt, atan2, pi
 
 

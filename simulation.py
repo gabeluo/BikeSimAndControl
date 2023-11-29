@@ -32,69 +32,74 @@ class Point:
     theta: float
 
 
-class State(Enum):
-    x = 0
-    x_dot = 1
-    y = 2
-    y_dot = 3
-    psi = 4
-    psi_dot = 5
+class DynamicStates:
+    def __init__(
+        self,
+        x: float,
+        x_dot: float,
+        y: float,
+        y_dot: float,
+        psi: float,
+        psi_dot: float,
+        X: float,
+        Y: float,
+    ):
+        self.x = x
+        self.x_dot = x_dot
+        self.y = y
+        self.y_dot = y_dot
+        self.psi = psi
+        self.psi_dot = psi_dot
+        self.X = X
+        self.Y = Y
+
+    def update_states(self, z_dot):
+        return DynamicStates(
+            self.x + z_dot[0],
+            self.x_dot + z_dot[1],
+            self.y + z_dot[2],
+            self.y_dot + z_dot[3],
+            self.psi + z_dot[4],
+            self.psi_dot + z_dot[5],
+            self.X,
+            self.Y,
+        )
+
+    def update_inertial_states(self, Z_dot):
+        self.X += Z_dot[0]
+        self.Y += Z_dot[1]
+        return self
+
+
+@dataclass
+class KinematicStates:
+    x: float
+    y: float
+    psi: float
 
 
 class Simulation:
     def __init__(self, bike: Bike, time_step=0.001):
         self.time_step = time_step
         self.bike = bike
-        # (x, x_dot, y, y_dot, psi, psi_dot)
-        self.states = np.zeros([6, 1])
-        self.states[State.x_dot.value][-1] = 0.1
-        # (X, Y) (inertial frame, used for plotting)
-        self.inertial_states = np.zeros([2, 1])
-
-    def find_z_dot(self, time, inputs: Input):
-        pass
-
-    # find the z_dot values for the inertia variables
-    def find_Z_dot(self, time):
-        return np.array(
-            [
-                self.states[State.x_dot.value][time]
-                * cos(self.states[State.psi.value][time])
-                - self.states[State.y_dot.value][time]
-                * sin(self.states[State.psi.value][time]),
-                self.states[State.x_dot.value][time]
-                * sin(self.states[State.psi.value][time])
-                + self.states[State.y_dot.value][time]
-                * cos(self.states[State.psi.value][time]),
-            ]
-        )
 
     def update(self, inputs: Input):
         # get the new z_dot values
-        z_dot = self.find_z_dot(-1, inputs)
+        z_dot = self.find_z_dot(inputs)
 
         # update the state variables
-        self.states = np.concatenate(
-            (self.states, np.array([self.states[:, -1] + z_dot * self.time_step]).T),
-            axis=1,
-        )
+        self.states.append(self.states[-1].update_states(z_dot * self.time_step))
 
-        Z_dot = self.find_Z_dot(-1)
+        Z_dot = self.find_Z_dot()
 
+        self.states[-1] = self.states[-1].update_inertial_states(Z_dot * self.time_step)
         # update the inertial state variables
-        self.inertial_states = np.concatenate(
-            (
-                self.inertial_states,
-                np.array([self.inertial_states[:, -1] + Z_dot * self.time_step]).T,
-            ),
-            axis=1,
-        )
 
     def get_current_state(self):
         return Point(
-            self.inertial_states[0][-1],
-            self.inertial_states[1][-1],
-            self.states[State.psi.value][-1],
+            self.states[-1].X,
+            self.states[-1].Y,
+            self.states[-1].psi,
         )
 
     def simulate(self, sim_time: int, inputs: Input):
@@ -114,20 +119,24 @@ class Simulation:
         plt.xlabel("X [m]")
         plt.ylabel("Y [m]")
         # plot the path
-        plt.plot(self.inertial_states[0], self.inertial_states[1], color="blue")
+        plt.plot(
+            [state.X for state in self.states],
+            [state.Y for state in self.states],
+            color="blue",
+        )
 
         # plot the markers
         MARKER_FREQ = 1 / self.time_step // 2
         # MARKER_FREQ = 1
-        for i in range(len(self.inertial_states[0])):
+        for i in range(len(self.states)):
             if i % MARKER_FREQ == 0:
                 plt.plot(
-                    self.inertial_states[0][i],
-                    self.inertial_states[1][i],
+                    self.states[i].X,
+                    self.states[i].Y,
                     marker=MarkerStyle(
                         "d",
                         transform=Affine2D().rotate_deg(
-                            degrees(self.states[State.psi.value][i]) - 90
+                            degrees(self.states[i].psi) - 90
                         ),
                         capstyle="round",
                     ),
@@ -139,57 +148,49 @@ class Simulation:
 
 
 class DynamicSim(Simulation):
-    def __init__(self, bike: Bike, time_step: float):
+    def __init__(self, bike: Bike, time_step: float, initial_x=0, initial_y=0):
         super().__init__(bike, time_step)
+        # (x, x_dot, y, y_dot, psi, psi_dot, X, Y)
+        self.states = [DynamicStates(0, 0.1, 0, 0, 0, 0, initial_x, initial_y)]
 
     # Calculate the z_dot values for the state variables
-    def find_z_dot(self, time: int, inputs: Input):
+    def find_z_dot(self, inputs: Input):
         front_theta = (
-            (
-                (
-                    self.states[State.y_dot.value][time]
-                    + self.bike.front_length * self.states[State.psi_dot.value][time]
-                )
-                / self.states[State.x_dot.value][time]
-            )
-            if self.states[State.x_dot.value][time] != 0
-            else 0
-        )
+            self.states[-1].y_dot + self.bike.front_length * self.states[-1].psi_dot
+        ) / self.states[-1].x_dot
         rear_theta = (
-            (
-                (
-                    self.states[State.y_dot.value][time]
-                    - self.bike.rear_length * self.states[State.psi_dot.value][time]
-                )
-                / self.states[State.x_dot.value][time]
-            )
-            if self.states[State.x_dot.value][time] != 0
-            else 0
-        )
+            self.states[-1].y_dot - self.bike.rear_length * self.states[-1].psi_dot
+        ) / self.states[-1].x_dot
         F_f = self.bike.front_corner_stiff * (inputs.delta - front_theta)
         F_r = -self.bike.rear_corner_stiff * rear_theta
 
         # calculate the current z_dot
         return np.array(
             [
-                self.states[State.x_dot.value][time],
+                self.states[-1].x_dot,
+                (self.states[-1].psi_dot * self.states[-1].y_dot + inputs.a),
+                self.states[-1].y_dot,
                 (
-                    self.states[State.psi_dot.value][time]
-                    * self.states[State.y_dot.value][time]
-                    + inputs.a
-                ),
-                self.states[State.y_dot.value][time],
-                (
-                    -self.states[State.psi_dot.value][time]
-                    * self.states[State.x_dot.value][time]
+                    -self.states[-1].psi_dot * self.states[-1].x_dot
                     + 2 / self.bike.mass * (F_f * cos(inputs.delta) + F_r)
                 ),
-                self.states[State.psi_dot.value][time],
+                self.states[-1].psi_dot,
                 (
                     2
                     / self.bike.inertia
                     * (self.bike.front_length * F_f - self.bike.rear_length * F_r)
                 ),
+            ]
+        )
+
+    # find the z_dot values for the inertia variables
+    def find_Z_dot(self):
+        return np.array(
+            [
+                self.states[-1].x_dot * cos(self.states[-1].psi)
+                - self.states[-1].y_dot * sin(self.states[-1].psi),
+                self.states[-1].x_dot * sin(self.states[-1].psi)
+                + self.states[-1].y_dot * cos(self.states[-1].psi),
             ]
         )
 
