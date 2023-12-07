@@ -20,7 +20,7 @@ class Bike:
 
 @dataclass
 class Input:
-    delta: float
+    delta_dot: float
     a: float
 
 
@@ -42,6 +42,7 @@ class DynamicStates:
         psi_dot: float,
         X: float,
         Y: float,
+        delta: float,
     ):
         self.x = x
         self.x_dot = x_dot
@@ -51,6 +52,7 @@ class DynamicStates:
         self.psi_dot = psi_dot
         self.X = X
         self.Y = Y
+        self.delta = delta
 
     def update_states(self, z_dot):
         return DynamicStates(
@@ -60,14 +62,32 @@ class DynamicStates:
             self.y_dot + z_dot[3],
             self.psi + z_dot[4],
             self.psi_dot + z_dot[5],
-            self.X,
-            self.Y,
+            self.X + z_dot[6],
+            self.Y + z_dot[7],
+            self.delta + z_dot[8],
         )
 
-    def update_inertial_states(self, Z_dot):
-        self.X += Z_dot[0]
-        self.Y += Z_dot[1]
-        return self
+    def display(self):
+        print(
+            "x:",
+            self.x,
+            "x_dot:",
+            self.x_dot,
+            "y:",
+            self.y,
+            "y_dot:",
+            self.y_dot,
+            "psi:",
+            self.psi,
+            "psi_dot:",
+            self.psi_dot,
+            "X:",
+            self.X,
+            "Y:",
+            self.Y,
+            "delta:",
+            self.delta,
+        )
 
 
 class KinematicStates:
@@ -77,15 +97,21 @@ class KinematicStates:
         y: float,
         psi: float,
         v: float,
+        delta: float,
     ):
         self.x = x
         self.y = y
         self.psi = psi
         self.v = v
+        self.delta = delta
 
     def update_states(self, z_dot):
         return KinematicStates(
-            self.x + z_dot[0], self.y + z_dot[1], self.psi + z_dot[2], self.v + z_dot[3]
+            self.x + z_dot[0],
+            self.y + z_dot[1],
+            self.psi + z_dot[2],
+            self.v + z_dot[3],
+            self.delta + z_dot[4],
         )
 
 
@@ -105,7 +131,7 @@ class DynamicSim(Simulation):
     def __init__(self, bike: Bike, time_step: float, initial_x=0, initial_y=0):
         super().__init__(bike, time_step)
         # (x, x_dot, y, y_dot, psi, psi_dot, X, Y)
-        self.states = [DynamicStates(0, 0.1, 0, 0, 0, 0, initial_x, initial_y)]
+        self.states = [DynamicStates(0, 0, 0, 0, 0, 0, initial_x, initial_y, 0)]
 
     def get_current_state(self):
         return Point(
@@ -117,12 +143,19 @@ class DynamicSim(Simulation):
     # Calculate the z_dot values for the state variables
     def find_z_dot(self, inputs: Input):
         front_theta = (
-            self.states[-1].y_dot + self.bike.front_length * self.states[-1].psi_dot
-        ) / self.states[-1].x_dot
+            (self.states[-1].y_dot + self.bike.front_length * self.states[-1].psi_dot)
+            / self.states[-1].x_dot
+            if self.states[-1].x_dot != 0
+            else 0
+        )
+
         rear_theta = (
-            self.states[-1].y_dot - self.bike.rear_length * self.states[-1].psi_dot
-        ) / self.states[-1].x_dot
-        F_f = self.bike.front_corner_stiff * (inputs.delta - front_theta)
+            (self.states[-1].y_dot - self.bike.rear_length * self.states[-1].psi_dot)
+            / self.states[-1].x_dot
+            if self.states[-1].x_dot != 0
+            else 0
+        )
+        F_f = self.bike.front_corner_stiff * (self.states[-1].delta - front_theta)
         F_r = -self.bike.rear_corner_stiff * rear_theta
 
         # calculate the current z_dot
@@ -133,7 +166,7 @@ class DynamicSim(Simulation):
                 self.states[-1].y_dot,
                 (
                     -self.states[-1].psi_dot * self.states[-1].x_dot
-                    + 2 / self.bike.mass * (F_f * cos(inputs.delta) + F_r)
+                    + 2 / self.bike.mass * (F_f * cos(self.states[-1].delta) + F_r)
                 ),
                 self.states[-1].psi_dot,
                 (
@@ -141,17 +174,11 @@ class DynamicSim(Simulation):
                     / self.bike.inertia
                     * (self.bike.front_length * F_f - self.bike.rear_length * F_r)
                 ),
-            ]
-        )
-
-    # find the z_dot values for the inertia variables
-    def find_Z_dot(self):
-        return np.array(
-            [
                 self.states[-1].x_dot * cos(self.states[-1].psi)
                 - self.states[-1].y_dot * sin(self.states[-1].psi),
                 self.states[-1].x_dot * sin(self.states[-1].psi)
                 + self.states[-1].y_dot * cos(self.states[-1].psi),
+                inputs.delta_dot,
             ]
         )
 
@@ -161,11 +188,6 @@ class DynamicSim(Simulation):
 
         # update the state variables
         self.states.append(self.states[-1].update_states(z_dot * self.time_step))
-
-        Z_dot = self.find_Z_dot()
-
-        # update the inertial state variables
-        self.states[-1] = self.states[-1].update_inertial_states(Z_dot * self.time_step)
 
     def plot(self):
         marker_colors = dict(
@@ -210,7 +232,7 @@ class KinematicSim(Simulation):
     def __init__(self, bike: Bike, time_step: float, initial_x=0, initial_y=0):
         super().__init__(bike, time_step)
         # (x, x_dot, y, y_dot, psi, psi_dot, X, Y)
-        self.states = [KinematicStates(initial_x, initial_y, 0, 0)]
+        self.states = [KinematicStates(initial_x, initial_y, 0, 0, 0)]
 
     def get_current_state(self):
         return Point(
@@ -224,7 +246,7 @@ class KinematicSim(Simulation):
         beta = atan(
             self.bike.rear_length
             / (self.bike.front_length + self.bike.rear_length)
-            * tan(inputs.delta)
+            * tan(self.states[-1].delta)
         )
 
         # calculate the current z_dot
@@ -234,6 +256,7 @@ class KinematicSim(Simulation):
                 self.states[-1].v * sin(self.states[-1].psi + beta),
                 self.states[-1].v / self.bike.front_length * sin(beta),
                 inputs.a,
+                inputs.delta_dot,
             ]
         )
 
@@ -284,22 +307,22 @@ class KinematicSim(Simulation):
 
 
 def main():
-    inputs = Input(delta=radians(5), a=1)
+    inputs = Input(delta_dot=radians(0.5), a=1)
     bike = Bike(
-        front_corner_stiff=6000,
-        rear_corner_stiff=6000,
-        mass=1235,
-        inertia=2200,
-        front_length=1,
-        rear_length=1,
+        front_corner_stiff=8000,
+        rear_corner_stiff=8000,
+        mass=2257,
+        inertia=3524.9,
+        front_length=1.33,
+        rear_length=1.616,
     )
     dynamic_simulation = DynamicSim(bike=bike, time_step=0.001)
-    dynamic_simulation.simulate(sim_time=30, inputs=inputs)
+    dynamic_simulation.simulate(sim_time=0.2, inputs=inputs)
     dynamic_simulation.plot()
 
-    kinematic_simulation = KinematicSim(bike=bike, time_step=0.001)
-    kinematic_simulation.simulate(sim_time=15, inputs=inputs)
-    kinematic_simulation.plot()
+    # kinematic_simulation = KinematicSim(bike=bike, time_step=0.001)
+    # kinematic_simulation.simulate(sim_time=30, inputs=inputs)
+    # kinematic_simulation.plot()
 
 
 if __name__ == "__main__":

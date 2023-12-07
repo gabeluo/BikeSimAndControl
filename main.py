@@ -10,6 +10,7 @@ def main(args=None):
     # controller = Controller(
     #     klp=1.1, kap=2.0, kli=0, kai=0, kld=0, kad=0, time_step=time_step
     # )
+
     # Kinematic Controller (use 5, 10 for x and y)
     controller = Controller(
         klp=1.0, kap=10.0, kli=0, kai=0, kld=0, kad=0, time_step=time_step
@@ -68,4 +69,4 @@ if __name__ == "__main__":
 
     args = argParser.parse_args()
 
-    # main(args)
+    main(args)
