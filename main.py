@@ -1,11 +1,9 @@
 import argparse
 from controller import Controller
 from simulation import DynamicSim, KinematicSim, Bike, Point, Input
-from sympy import *
+from sympy import diff, Symbol, sqrt, atan2
 
 t = Symbol("t")
-a = Symbol("a")
-b = Symbol("b")
 
 
 def find_func(bike):
