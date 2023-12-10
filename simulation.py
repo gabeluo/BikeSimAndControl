@@ -122,10 +122,53 @@ class Simulation:
         self.bike = bike
 
     def simulate(self, sim_time: int, inputs: Input):
-        counter = 0
-        while counter < sim_time / self.time_step - 1:
+        marker_colors = dict(
+            markersize=15,
+            markerfacecolor="red",
+            markerfacecoloralt="lightsteelblue",
+            markeredgecolor="brown",
+        )
+
+        fig, ax = plt.subplots()
+        ax.set_title("Kinematic Robot Trajectory")
+        ax.set_xlabel("X [m]")
+        ax.set_ylabel("Y [m]")
+        ax.grid()
+        ax.set(xlim=[-5, 50], ylim=[-5, 50])
+
+        # plot the path
+        path = ax.plot(
+            0,
+            0,
+            color="blue",
+            markevery=[-1],
+            # marker=MarkerStyle(
+            #     "$\Omega$",
+            #     transform=Affine2D().rotate_deg(degrees(self.states[-1].psi) + 90),
+            #     capstyle="round",
+            # ),
+            **marker_colors
+        )[0]
+
+        def update(frame):
+            # print(x_values[:frame])
+            path.set_xdata([state.x for state in self.states])
+            path.set_ydata([state.y for state in self.states])
+            marker = (3, 2, degrees(self.states[-1].psi) - 90)
+            path.set_marker(marker)
             self.update(inputs)
-            counter += 1
+            return path
+
+        anim = animation.FuncAnimation(
+            fig=fig,
+            func=update,
+            frames=int(sim_time / self.time_step - 1),
+            interval=0.001,
+            repeat=False,
+        )
+        # show plot
+
+        plt.show()
 
 
 class DynamicSim(Simulation):
@@ -440,13 +483,13 @@ def main():
         front_length=1.33,
         rear_length=1.616,
     )
-    dynamic_simulation = DynamicSim(bike=bike, time_step=0.01)
-    dynamic_simulation.simulate(sim_time=0.07, inputs=inputs)
-    dynamic_simulation.plot()
+    # dynamic_simulation = DynamicSim(bike=bike, time_step=0.01)
+    # dynamic_simulation.simulate(sim_time=0.07, inputs=inputs)
+    # dynamic_simulation.plot()
 
-    # kinematic_simulation = KinematicSim(bike=bike, time_step=0.001)
-    # kinematic_simulation.simulate(sim_time=20, inputs=inputs)
-    # kinematic_simulation.plot_animate()
+    kinematic_simulation = KinematicSim(bike=bike, time_step=0.01)
+    kinematic_simulation.simulate(sim_time=20, inputs=inputs)
+    # kinematic_simulation.plot()
 
 
 if __name__ == "__main__":
