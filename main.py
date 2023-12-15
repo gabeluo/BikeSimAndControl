@@ -3,21 +3,21 @@ from controller import Controller
 from simulation import (
     DynamicSim,
     KinematicSim,
-    DynamicStates,
-    KinematicStates,
     Bike,
     Point,
     Input,
 )
-from sympy import diff, Symbol, sqrt, atan2
+from sympy import diff, Symbol, sqrt, sin, atan2
 
 t = Symbol("t")
 
 
 def find_func(bike):
     x = t
+    print("x:", x)
     # y = 0.01*(exp(t)-1)
-    y = t**2
+    y = sin(t)
+    print("y:", y)
     theta = atan2(diff(y), diff(x))
     print("theta:", theta)
     v = sqrt(diff(x) ** 2 + diff(y) ** 2)
@@ -28,7 +28,7 @@ def find_func(bike):
     print("v_dot:", v_dot)
     delta_dot = diff(delta)
     print("delta_dot:", delta_dot)
-    return theta, v, delta, v_dot, delta_dot
+    return x, y, theta, v, delta, v_dot, delta_dot
 
 
 def update_value(v_dot_func, delta_dot_func, time):
@@ -55,6 +55,8 @@ def main(args=None):
     # Find the functions for the function trajectory
     if args.trajectory == "function":
         (
+            x_func,
+            y_func,
             theta_func,
             v_func,
             delta_func,
@@ -62,11 +64,13 @@ def main(args=None):
             delta_dot_func,
         ) = find_func(bike)
     else:
-        theta_func = 0
-        v_func = 0
-        delta_func = 0
-        v_dot_func = 0
-        delta_dot_func = 0
+        x_func = None
+        y_func = None
+        theta_func = None
+        v_func = None
+        delta_func = None
+        v_dot_func = None
+        delta_dot_func = None
 
     if args.sim == "dynamic":
         simulation = DynamicSim(bike=bike, time_step=time_step, animate=True)
@@ -88,7 +92,9 @@ def main(args=None):
             initial_delta=delta,
         )
         controller = Controller(
-            klp=0.1, kap=5, kli=0, kai=0, kld=3, kad=5, time_step=time_step
+            klp=0.01, kap=1.1, kli=0, kai=0, kld=11, kad=8, time_step=time_step
+            # klp=0.1, kap=5, kli=0, kai=0, kld=3, kad=5, time_step=time_step
+
         )
     else:
         print("This simulation type does not exist.")
@@ -98,7 +104,7 @@ def main(args=None):
 
     time_multiple = 0
 
-    while time_multiple < 0.5 * 10**4:
+    while time_multiple < 7 * (1/time_step):
         reached_goal = (
             True
             if controller.linear_error(simulation.get_current_state(), goal_point)
@@ -111,19 +117,50 @@ def main(args=None):
             break
 
         if args.trajectory == "function":
-            new_inputs = update_value(
+            new_inputs_open_loop = update_value(
                 v_dot_func, delta_dot_func, time_multiple * time_step
+            )
+            new_inputs_closed_loop = controller.new_inputs(
+                simulation.get_current_state(),
+                Point(
+                    x=x_func.subs(t, (time_multiple+1) * time_step).evalf(),
+                    y=y_func.subs(t, (time_multiple+1) * time_step).evalf(),
+                    theta=theta_func.subs(t, (time_multiple+1) * time_step).evalf(),
+                ),
+            )
+            open_loop_factor = 0.975
+            closed_loop_factor = 1 - open_loop_factor
+            new_inputs = Input(
+                (
+                    open_loop_factor * new_inputs_open_loop.delta_dot
+                    + closed_loop_factor * new_inputs_closed_loop.delta_dot
+                ),
+                (
+                    open_loop_factor * new_inputs_open_loop.a
+                    + closed_loop_factor * new_inputs_closed_loop.a
+                ),
             )
         else:
             new_inputs = controller.new_inputs(
                 simulation.get_current_state(), goal_point
             )
 
-        simulation.update(new_inputs, time_multiple)
+        simulation.update(new_inputs, time_multiple, x_func, y_func)
 
         time_multiple += 1
 
-    simulation.plot(animate=False)
+    simulation.plot(animate=False, show=True, x_func=x_func, y_func=y_func)
+
+    # lam_x = lambdify(t, x_func, modules=["numpy"])
+    # lam_y = lambdify(t, y_func, modules=["numpy"])
+    # t_vals = linspace(0, int(time_multiple * simulation.time_step), time_multiple)
+    # x_vals = lam_x(t_vals)
+    # y_vals = lam_y(t_vals)
+
+    # plt.plot(x_vals, y_vals, label="Ideal path", color="orange")
+    # plt.legend()
+    # plt.show()
+
     print(f"The simulation took {time_multiple * simulation.time_step} seconds")
 
 
@@ -133,7 +170,7 @@ if __name__ == "__main__":
     argParser.add_argument("--x", type=float, default=5)
     argParser.add_argument("--y", type=float, default=5)
     argParser.add_argument("--theta", type=float, default=0)
-    argParser.add_argument("--trajectory", type=str, default="function")
+    argParser.add_argument("--trajectory", type=str, default="trajectory")
     argParser.add_argument("--sim", type=str, default="kinematic")
 
     args = argParser.parse_args()
