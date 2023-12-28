@@ -79,7 +79,7 @@ class Simulation:
             axis=1,
         )
 
-        if self.animate and counter % 10 == 0:
+        if self.animate and counter % 20 == 0:
             self.plot(animate=True, x_func=x_func, y_func=y_func)
             plt.pause(0.01)
 

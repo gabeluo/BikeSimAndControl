@@ -41,7 +41,7 @@ def update_value(v_dot_func, delta_dot_func, time):
 def main(args=None):
     # Used only for the point trajectory
     reach_threshold = 0.001
-    time_step = 0.001
+    time_step = 0.01
 
     bike = Bike(
         front_corner_stiff=8000,
@@ -85,17 +85,20 @@ def main(args=None):
             bike=bike,
             time_step=time_step,
             animate=True,
-            initial_x=0,
-            initial_y=0,
+            initial_x=-0.2,
+            initial_y=-0.2,
             initial_psi=theta,
             initial_v=v,
             initial_delta=delta,
         )
         controller = Controller(
-            klp=0.01, kap=1.1, kli=0, kai=0, kld=11, kad=8, time_step=time_step
-            # klp=0.1, kap=5, kli=0, kai=0, kld=3, kad=5, time_step=time_step
+            # klp=0.01, kap=1.1, kli=0, kai=0, kld=11, kad=8, time_step=time_step
+            klp=0.01, kap=10, kli=0, kai=0, kld=0.05, kad=45, time_step=time_step
 
         )
+
+        # Note that the gain for acceleration is 10 times smaller than the gain for delta
+
     else:
         print("This simulation type does not exist.")
         return
@@ -104,7 +107,7 @@ def main(args=None):
 
     time_multiple = 0
 
-    while time_multiple < 7 * (1/time_step):
+    while time_multiple < 6.28 * (1/time_step):
         reached_goal = (
             True
             if controller.linear_error(simulation.get_current_state(), goal_point)
@@ -123,13 +126,13 @@ def main(args=None):
             new_inputs_closed_loop = controller.new_inputs(
                 simulation.get_current_state(),
                 Point(
-                    x=x_func.subs(t, (time_multiple+1) * time_step).evalf(),
-                    y=y_func.subs(t, (time_multiple+1) * time_step).evalf(),
+                    x=x_func.subs(t, (time_multiple+25) * time_step).evalf(),
+                    y=y_func.subs(t, (time_multiple+25) * time_step).evalf(),
                     theta=theta_func.subs(t, (time_multiple+1) * time_step).evalf(),
                 ),
             )
-            open_loop_factor = 0.975
-            closed_loop_factor = 1 - open_loop_factor
+            open_loop_factor = 1
+            closed_loop_factor = 1
             new_inputs = Input(
                 (
                     open_loop_factor * new_inputs_open_loop.delta_dot
@@ -170,7 +173,7 @@ if __name__ == "__main__":
     argParser.add_argument("--x", type=float, default=5)
     argParser.add_argument("--y", type=float, default=5)
     argParser.add_argument("--theta", type=float, default=0)
-    argParser.add_argument("--trajectory", type=str, default="trajectory")
+    argParser.add_argument("--trajectory", type=str, default="function")
     argParser.add_argument("--sim", type=str, default="kinematic")
 
     args = argParser.parse_args()
