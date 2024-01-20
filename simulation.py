@@ -198,6 +198,7 @@ class Simulation:
                     ),
                 )
 
+
 class DynamicSim(Simulation):
     def __init__(
         self,
