@@ -46,6 +46,8 @@ class DynamicStates(Enum):
     x = 6
     y = 7
     delta = 8
+    x_p = 9
+    y_p = 10
 
 
 class KinematicStates(Enum):
@@ -79,7 +81,7 @@ class Simulation:
             axis=1,
         )
 
-        if self.animate and counter % 20 == 0:
+        if self.animate and counter % 15 == 0:
             self.plot(animate=True, x_func=x_func, y_func=y_func)
             plt.pause(0.01)
 
@@ -118,11 +120,12 @@ class Simulation:
         plt.grid(True)
 
         if animate:
+            # Plot robot's trajectory
             plt.plot(
                 self.states[States.x.value],
                 self.states[States.y.value],
                 color="blue",
-                label="Robot trajectory",
+                label="Robot trajectory in Global Frame",
                 markevery=[-1],
                 marker=MarkerStyle(
                     "$\Omega$",
@@ -134,6 +137,24 @@ class Simulation:
                 **self.marker_colors
             )
 
+            if type(self) is DynamicSim:
+                # Plot base frame
+                plt.plot(
+                    self.states[States.X.value],
+                    self.states[States.Y.value],
+                    color="green",
+                    label="Local Coordinate Frame",
+                )
+
+                # Plot p frame
+                plt.plot(
+                    self.states[States.x_p.value],
+                    self.states[States.y_p.value],
+                    color="yellow",
+                    label="p coordinate frame",
+                )
+
+            # Plot the ideal trajectory if given
             if x_func:
                 lam_x = lambdify(t, x_func, modules=["numpy"])
                 lam_y = lambdify(t, y_func, modules=["numpy"])
@@ -143,19 +164,19 @@ class Simulation:
                 x_vals = lam_x(t_vals)
                 y_vals = lam_y(t_vals)
 
-                plt.plot(x_vals, y_vals, label="Ideal path", color="orange")
+                plt.plot(x_vals, y_vals, label="Ideal Path", color="orange")
                 plt.legend()
 
         else:
-            # plot the path
+            # Plot the robot trajectory
             plt.plot(
                 self.states[States.x.value],
                 self.states[States.y.value],
                 color="blue",
-                label="Robot Trajectory",
+                label="Robot Trajectory in Global Frame",
             )
 
-            # plot the markers
+            # Plot the markers
             MARKER_FREQ = 1 / self.time_step // 2
             # MARKER_FREQ = 1
             for i in range(len(self.states[0])):
@@ -182,7 +203,49 @@ class Simulation:
                 x_vals = lam_x(t_vals)
                 y_vals = lam_y(t_vals)
 
-                plt.plot(x_vals, y_vals, label="Ideal path", color="orange")
+                plt.plot(x_vals, y_vals, label="Ideal Path", color="orange")
+                plt.legend()
+
+            if type(self) is DynamicSim:
+                # Plot base frame
+                plt.plot(
+                    self.states[States.X.value],
+                    self.states[States.Y.value],
+                    color="green",
+                    label="Local Coordinate Frame",
+                )
+
+                # Plot p frame
+                plt.plot(
+                    self.states[States.x_p.value],
+                    self.states[States.y_p.value],
+                    color="yellow",
+                    label="P-Coordinate Frame",
+                )
+
+                plt.legend()
+
+                t_vals = np.linspace(
+                    0, len(self.states[0]) * self.time_step, len(self.states[0])
+                )
+                plt.figure()
+                plt.plot(
+                    t_vals,
+                    self.states[States.psi.value],
+                    color="red",
+                    label="Psi values",
+                )
+                plt.plot(
+                    t_vals,
+                    self.states[States.delta.value],
+                    color="blue",
+                    label="Delta values",
+                )
+                plt.xlabel("Value")
+                plt.ylabel("t [s]")
+                # plt.axis("equal")
+                # plt.axis([-5, 30, -5, 30])
+                plt.grid(True)
                 plt.legend()
 
             if show:
@@ -210,7 +273,10 @@ class DynamicSim(Simulation):
         initial_X_dot=0,
         initial_Y_dot=0,
         initial_psi=0,
+        initial_psi_dot=0,
         initial_delta=0,
+        initial_x_p=0,
+        initial_y_p=0,
     ):
         super().__init__(bike, time_step, animate)
         # (x, x_dot, y, y_dot, psi, psi_dot, X, Y)
@@ -221,10 +287,12 @@ class DynamicSim(Simulation):
                 [0],
                 [initial_Y_dot],
                 [initial_psi],
-                [0],
+                [initial_psi_dot],
                 [initial_x],
                 [initial_y],
                 [initial_delta],
+                [initial_x_p],
+                [initial_y_p],
             ]
         )
 
@@ -286,6 +354,11 @@ class DynamicSim(Simulation):
                 + self.states[DynamicStates.Y_dot.value][-1]
                 * cos(self.states[DynamicStates.psi.value][-1]),
                 inputs.delta_dot,
+                self.states[DynamicStates.X_dot.value][-1],
+                self.states[DynamicStates.Y_dot.value][-1]
+                - self.bike.inertia
+                / (self.bike.front_length * self.bike.mass)
+                * self.states[DynamicStates.psi_dot.value][-1],
             ]
         )
 
@@ -344,13 +417,13 @@ def main():
         rear_length=1.616,
     )
     t1 = time.time()
-    dynamic_simulation = DynamicSim(bike=bike, time_step=0.01, animate=False)
+    dynamic_simulation = DynamicSim(bike=bike, time_step=0.01, animate=True)
     dynamic_simulation.simulate(sim_time=25, inputs=inputs)
     dynamic_simulation.plot(animate=False)
 
-    kinematic_simulation = KinematicSim(bike=bike, time_step=0.01, animate=True)
-    kinematic_simulation.simulate(sim_time=20, inputs=inputs)
-    kinematic_simulation.plot(animate=False)
+    # kinematic_simulation = KinematicSim(bike=bike, time_step=0.01, animate=True)
+    # kinematic_simulation.simulate(sim_time=20, inputs=inputs)
+    # kinematic_simulation.plot(animate=False)
     print("Total time:", time.time() - t1, "seconds")
 
 

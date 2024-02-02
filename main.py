@@ -8,6 +8,7 @@ from simulation import (
     Input,
 )
 from openloop import KinematicOLController, DynamicOLController
+from math import pi
 
 
 def main(args=None):
@@ -18,7 +19,10 @@ def main(args=None):
     time_step = 0.01
 
     # How long to run the function for
-    duration = 12
+    duration = 2
+
+    # look_ahead distance when using the closed-loop controller
+    look_ahead = 25
 
     # Bike parameters
     # Note that only the lengths are used for the kinematic simulation
@@ -31,21 +35,46 @@ def main(args=None):
         rear_length=1.616,
     )
 
+    # bike = Bike(
+    #     front_corner_stiff=14000,
+    #     rear_corner_stiff=15000,
+    #     mass=990,
+    #     inertia=1800,
+    #     front_length=1.25,
+    #     rear_length=1.3,
+    # )
+
     if args.sim == "dynamic":
         olcontroller = DynamicOLController(bike=bike, time_step=time_step)
-        theta, v, delta = olcontroller.find_initial_vals()
+        psi, psi_dot, x_dot, y_dot, delta, x_p, y_p = olcontroller.find_initial_vals()
         simulation = DynamicSim(
             bike=bike,
             time_step=time_step,
             animate=True,
-            initial_x=-0.2,
-            initial_y=-0.2,
-            initial_psi=theta,
-            initial_v=v,
+            # global x and y position
+            # initial_x=0,
+            # initial_y=0,
+            # # local x_dot and y_dot
+            # initial_X_dot=1.0,
+            # initial_Y_dot=0.0,
+            # # heading with respect to global frame
+            # initial_psi=pi / 4,
+            # initial_delta=0,
+            # global x and y position
+            initial_x=0,
+            initial_y=0,
+            # # local x_dot and y_dot
+            initial_X_dot=x_dot,
+            initial_Y_dot=y_dot,
+            # # heading with respect to global frame
+            initial_psi=psi,
+            initial_psi_dot=psi_dot,
             initial_delta=delta,
+            initial_x_p=x_p,
+            initial_y_p=y_p,
         )
         controller = Controller(
-            klp=0.5, kap=2.0, kli=0, kai=0, kld=1.0, kad=6, time_step=time_step
+            klp=0.001, kap=0.1, kli=0, kai=0, kld=0.001, kad=0.02, time_step=time_step
         )
     elif args.sim == "kinematic":
         olcontroller = KinematicOLController(bike=bike, time_step=time_step)
@@ -79,20 +108,19 @@ def main(args=None):
     time_multiple = 0
 
     while time_multiple < duration * (1 / time_step):
-        reached_goal = (
-            True
-            if controller.linear_error(simulation.get_current_state(), goal_point)
-            < reach_threshold
-            else False
-        )
+        if args.trajectory == "point":
+            reached_goal = (
+                True
+                if controller.linear_error(simulation.get_current_state(), goal_point)
+                < reach_threshold
+                else False
+            )
 
-        if reached_goal:
-            print("reached goal")
-            break
+            if reached_goal:
+                print("Reached goal!")
+                break
 
         if args.trajectory == "function":
-            look_ahead = 25
-
             new_inputs_open_loop = olcontroller.update_value(time_multiple * time_step)
             new_inputs_closed_loop = controller.new_inputs(
                 simulation.get_current_state(),
@@ -101,7 +129,7 @@ def main(args=None):
 
             # Give the closed-loop controller equal weight to the open-loop
             open_loop_factor = 1
-            closed_loop_factor = 1
+            closed_loop_factor = 0
             new_inputs = Input(
                 (
                     open_loop_factor * new_inputs_open_loop.delta_dot
@@ -117,7 +145,9 @@ def main(args=None):
                 simulation.get_current_state(), goal_point
             )
 
-        simulation.update(new_inputs, time_multiple, x_func, y_func)
+        simulation.update(
+            inputs=new_inputs, counter=time_multiple, x_func=x_func, y_func=y_func
+        )
 
         time_multiple += 1
 
@@ -143,7 +173,7 @@ if __name__ == "__main__":
     argParser.add_argument("--y", type=float, default=5)
     argParser.add_argument("--theta", type=float, default=0)
     argParser.add_argument("--trajectory", type=str, default="function")
-    argParser.add_argument("--sim", type=str, default="kinematic")
+    argParser.add_argument("--sim", type=str, default="dynamic")
 
     args = argParser.parse_args()
 
