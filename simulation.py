@@ -81,7 +81,7 @@ class Simulation:
             axis=1,
         )
 
-        if self.animate and counter % 15 == 0:
+        if self.animate and counter % 20 == 0:
             self.plot(animate=True, x_func=x_func, y_func=y_func)
             plt.pause(0.01)
 
@@ -146,13 +146,13 @@ class Simulation:
                     label="Local Coordinate Frame",
                 )
 
-                # Plot p frame
-                plt.plot(
-                    self.states[States.x_p.value],
-                    self.states[States.y_p.value],
-                    color="yellow",
-                    label="p coordinate frame",
-                )
+                # # Plot p frame
+                # plt.plot(
+                #     self.states[States.x_p.value],
+                #     self.states[States.y_p.value],
+                #     color="yellow",
+                #     label="p coordinate frame",
+                # )
 
             # Plot the ideal trajectory if given
             if x_func:
@@ -215,13 +215,13 @@ class Simulation:
                     label="Local Coordinate Frame",
                 )
 
-                # Plot p frame
-                plt.plot(
-                    self.states[States.x_p.value],
-                    self.states[States.y_p.value],
-                    color="yellow",
-                    label="P-Coordinate Frame",
-                )
+                # # Plot p frame
+                # plt.plot(
+                #     self.states[States.x_p.value],
+                #     self.states[States.y_p.value],
+                #     color="yellow",
+                #     label="P-Coordinate Frame",
+                # )
 
                 plt.legend()
 
@@ -275,8 +275,6 @@ class DynamicSim(Simulation):
         initial_psi=0,
         initial_psi_dot=0,
         initial_delta=0,
-        initial_x_p=0,
-        initial_y_p=0,
     ):
         super().__init__(bike, time_step, animate)
         # (x, x_dot, y, y_dot, psi, psi_dot, X, Y)
@@ -291,8 +289,6 @@ class DynamicSim(Simulation):
                 [initial_x],
                 [initial_y],
                 [initial_delta],
-                [initial_x_p],
-                [initial_y_p],
             ]
         )
 
@@ -354,11 +350,6 @@ class DynamicSim(Simulation):
                 + self.states[DynamicStates.Y_dot.value][-1]
                 * cos(self.states[DynamicStates.psi.value][-1]),
                 inputs.delta_dot,
-                self.states[DynamicStates.X_dot.value][-1],
-                self.states[DynamicStates.Y_dot.value][-1]
-                - self.bike.inertia
-                / (self.bike.front_length * self.bike.mass)
-                * self.states[DynamicStates.psi_dot.value][-1],
             ]
         )
 

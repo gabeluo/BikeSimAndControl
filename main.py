@@ -16,7 +16,7 @@ def main(args=None):
     reach_threshold = 0.001
 
     # Time step for the sim and controller
-    time_step = 0.01
+    time_step = 0.001
 
     # How long to run the function for
     duration = 2
@@ -46,7 +46,7 @@ def main(args=None):
 
     if args.sim == "dynamic":
         olcontroller = DynamicOLController(bike=bike, time_step=time_step)
-        psi, psi_dot, x_dot, y_dot, delta, x_p, y_p = olcontroller.find_initial_vals()
+        psi, psi_dot, x_dot, y_dot, delta = olcontroller.find_initial_vals()
         simulation = DynamicSim(
             bike=bike,
             time_step=time_step,
@@ -68,10 +68,7 @@ def main(args=None):
             initial_Y_dot=y_dot,
             # # heading with respect to global frame
             initial_psi=psi,
-            initial_psi_dot=psi_dot,
             initial_delta=delta,
-            initial_x_p=x_p,
-            initial_y_p=y_p,
         )
         controller = Controller(
             klp=0.001, kap=0.1, kli=0, kai=0, kld=0.001, kad=0.02, time_step=time_step
@@ -121,11 +118,11 @@ def main(args=None):
                 break
 
         if args.trajectory == "function":
-            new_inputs_open_loop = olcontroller.update_value(time_multiple * time_step)
-            new_inputs_closed_loop = controller.new_inputs(
-                simulation.get_current_state(),
-                olcontroller.find_next_point(look_ahead, time_multiple),
-            )
+            new_inputs_open_loop = olcontroller.update_value(time_multiple * time_step, bike)
+            # new_inputs_closed_loop = controller.new_inputs(
+            #     simulation.get_current_state(),
+            #     olcontroller.find_next_point(look_ahead, time_multiple),
+            # )
 
             # Give the closed-loop controller equal weight to the open-loop
             open_loop_factor = 1
@@ -133,11 +130,11 @@ def main(args=None):
             new_inputs = Input(
                 (
                     open_loop_factor * new_inputs_open_loop.delta_dot
-                    + closed_loop_factor * new_inputs_closed_loop.delta_dot
+                    + closed_loop_factor * 0.0
                 ),
                 (
                     open_loop_factor * new_inputs_open_loop.a
-                    + closed_loop_factor * new_inputs_closed_loop.a
+                    + closed_loop_factor * 0.0
                 ),
             )
         else:
