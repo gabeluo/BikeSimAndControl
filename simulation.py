@@ -81,9 +81,12 @@ class Simulation:
             axis=1,
         )
 
-        if self.animate and counter % 20 == 0:
+        print("psi", self.states[DynamicStates.psi.value][-1])
+        print("delta", self.states[DynamicStates.delta.value][-1])
+
+        if self.animate and counter % 1 == 0:
             self.plot(animate=True, x_func=x_func, y_func=y_func)
-            plt.pause(0.01)
+            plt.pause(0.5)
 
     def simulate(self, sim_time: int, inputs: Input):
         counter = 0
@@ -155,17 +158,17 @@ class Simulation:
                 # )
 
             # Plot the ideal trajectory if given
-            if x_func:
-                lam_x = lambdify(t, x_func, modules=["numpy"])
-                lam_y = lambdify(t, y_func, modules=["numpy"])
-                t_vals = np.linspace(
-                    0, len(self.states[0]) * self.time_step, len(self.states[0])
-                )
-                x_vals = lam_x(t_vals)
-                y_vals = lam_y(t_vals)
+            # if x_func:
+            #     lam_x = lambdify(t, x_func, modules=["numpy"])
+            #     lam_y = lambdify(t, y_func, modules=["numpy"])
+            #     t_vals = np.linspace(
+            #         0, len(self.states[0]) * self.time_step, len(self.states[0])
+            #     )
+            #     x_vals = lam_x(t_vals)
+            #     y_vals = lam_y(t_vals)
 
-                plt.plot(x_vals, y_vals, label="Ideal Path", color="orange")
-                plt.legend()
+            #     plt.plot(x_vals, y_vals, label="Ideal Path", color="orange")
+            #     plt.legend()
 
         else:
             # Plot the robot trajectory

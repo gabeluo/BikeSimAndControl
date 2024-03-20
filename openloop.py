@@ -100,7 +100,7 @@ class DynamicOLController(OLController):
         self.x_ddot = diff(self.x_dot)
         print("x_ddot", self.x_ddot)
 
-        self.y = sin(self.t)
+        self.y = self.t
         print("y:", self.y)
 
         self.y_dot = diff(self.y)
@@ -186,8 +186,15 @@ class DynamicOLController(OLController):
             * cos(self.delta)
         )
 
-        # theta, theta_dot, delta, a, delta_dot
-        self.states = np.array([[0], [0], [0], [0]])
+        # theta, theta_dot, delta, a
+        self.states = np.array(
+            [
+                [self.initial_theta.subs(self.t, 0)],
+                [self.initial_theta_dot.subs(self.t, 0)],
+                [0],
+                [0],
+            ]
+        )
 
         # print(nsolve(
         #     (self.eqn1.subs([(self.t, 1), (self.theta, 0.495), (self.theta_dot, -0.651)]), self.eqn2.subs([(self.t, 1), (self.theta, 0.495), (self.theta_dot, -0.651)])),
@@ -353,7 +360,13 @@ class DynamicOLController(OLController):
         delta = result[1]
 
         theta_ddot = self.theta_ddot.subs(
-            [(self.t, time), (self.a, a), (self.delta, delta)]
+            [
+                (self.t, time),
+                (self.a, a),
+                (self.delta, delta),
+                (self.theta, self.states[0][-1]),
+                (self.theta_dot, self.states[1][-1]),
+            ]
         )
 
         self.states = np.concatenate(
@@ -371,6 +384,13 @@ class DynamicOLController(OLController):
         )
         self.states[2][-1] = delta
         self.states[3][-1] = a
+
+        print(
+            Input(
+                delta_dot=(self.states[2][-1] - self.states[2][-2]) / self.time_step,
+                a=a,
+            )
+        )
 
         return Input(
             delta_dot=(self.states[2][-1] - self.states[2][-2]) / self.time_step,
