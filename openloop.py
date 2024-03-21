@@ -112,15 +112,6 @@ class DynamicOLController(OLController):
         self.initial_theta = atan2(self.y_dot, self.x_dot)
         self.initial_theta_dot = diff(self.initial_theta)
 
-        # self.theta = atan2(self.y_dot, self.x_dot)
-        # print("theta:", self.theta)
-
-        # self.theta_dot = diff(self.theta)
-        # print("theta_dot:", self.theta_dot)
-
-        # self.theta_ddot = diff(self.theta_dot)
-        # print("theta_ddot", self.theta_ddot)
-
         self.local_x_dot = cos(self.theta) * self.x_dot + sin(self.theta) * self.y_dot
         self.local_y_dot = -sin(self.theta) * self.x_dot + cos(self.theta) * self.y_dot
 
@@ -158,24 +149,6 @@ class DynamicOLController(OLController):
             + cos(self.theta) * self.theta_dot * self.local_y_dot
         ) / sin(self.theta) - self.a
 
-        # self.a = (
-        #     self.x_ddot
-        #     - cos(self.theta) * self.local_x_ddot
-        #     + -1 * sin(self.theta) * self.theta_dot * self.local_x_dot
-        # ) / cos(self.theta)
-
-        # self.eqn = (
-        #     alpha_f * cos(self.delta)
-        #     - self.theta_ddot
-        #     * -1
-        #     * bike.inertia
-        #     / 2
-        #     / (bike.front_length + bike.rear_length)
-        #     / bike.front_corner_stiff
-        # )
-
-        # self.states = [0]
-
         self.theta_ddot = (
             2
             / bike.inertia
@@ -195,82 +168,6 @@ class DynamicOLController(OLController):
                 [0],
             ]
         )
-
-        # print(nsolve(
-        #     (self.eqn1.subs([(self.t, 1), (self.theta, 0.495), (self.theta_dot, -0.651)]), self.eqn2.subs([(self.t, 1), (self.theta, 0.495), (self.theta_dot, -0.651)])),
-        #     (self.a, self.delta),
-        #     (self.states[3][-1], self.states[2][-1]),
-        # ))
-
-        # equations = [eqn1.subs(self.t, 1), eqn2.subs(self.t, 1)]
-        # equations_func = [lambdify((self.a, self.delta), eq) for eq in equations]
-
-        # initial_guess = [0.1, 0.1]
-
-        # solution = fsolve([eq(*vars) for eq in equations_func], initial_guess)
-
-        # solution = solve((eqn1.subs(self.t, 1), eqn2.subs(self.t, 1)), (self.delta, self.a))
-        # print("Solution", solution)
-
-        # self.x_p_dot = diff(self.x_p)
-        # print("x_p_dot:", self.x_p_dot)
-
-        # self.x_dot = self.x_p_dot
-
-        # self.y_p_dot = diff(self.y_p)
-        # print("y_p_dot", self.y_p_dot)
-
-        # self.y_dot = self.y_p_dot / (bike.front_length * bike.mass) - bike.inertia / (
-        #     bike.front_length * bike.mass
-        # ) * (
-        #     bike.front_length * bike.mass * self.x_p_dot * diff(self.y_p_dot)
-        #     + bike.rear_corner_stiff
-        #     * (bike.front_length + bike.rear_length)
-        #     * self.y_p_dot
-        # ) / (
-        #     bike.rear_corner_stiff
-        #     * (bike.front_length + bike.rear_length)
-        #     * (bike.inertia - bike.front_length * bike.rear_length * bike.mass)
-        #     * (bike.front_length * bike.mass * self.x_p_dot) ** 2
-        # )
-        # print("y_dot:", self.y_dot)
-
-        # self.psi_dot = (
-        #     -1
-        #     * (
-        #         bike.front_length**2 * bike.mass**2 * self.x_p_dot * diff(self.y_p_dot)
-        #         + bike.rear_corner_stiff
-        #         * (bike.front_length + bike.rear_length)
-        #         * (bike.front_length * bike.mass)
-        #         * self.y_p_dot
-        #     )
-        #     / (
-        #         bike.rear_corner_stiff
-        #         * (bike.front_length + bike.rear_length)
-        #         * (bike.inertia - bike.front_length * bike.rear_length * bike.mass)
-        #         + (bike.front_length * bike.mass * self.x_p_dot) ** 2
-        #     )
-        # )
-        # print("psi_dot:", self.psi_dot)
-
-        # self.psi = integrate(self.psi_dot, self.t)
-        # print("psi:", self.psi)
-
-        # self.x_dot_dot = diff(self.x_dot) - self.psi_dot * self.y_dot
-        # print("x_dot_dot:", self.x_dot_dot)
-
-        # self.delta = (
-        #     diff(self.psi_dot) * bike.inertia / 2
-        #     + bike.rear_length
-        #     * bike.rear_corner_stiff
-        #     * ((bike.rear_length * self.psi_dot - self.y_dot) / self.x_dot)
-        # ) / (bike.front_length * bike.front_corner_stiff) + (
-        #     self.y_dot + bike.front_length * self.psi_dot
-        # ) / self.x_dot
-        # print("delta:", self.delta)
-
-        # self.delta_dot = diff(self.delta)
-        # print("delta_dot:", self.delta_dot)
 
     def find_initial_vals(self):
         psi = self.initial_theta.subs(self.t, 0).evalf() if self.initial_theta else 0
@@ -301,40 +198,6 @@ class DynamicOLController(OLController):
         )
 
     def update_value(self, time, bike):
-
-        # delta_0 = (
-        #     (self.local_y_dot + (bike.front_length + bike.rear_length) * self.theta_dot)
-        #     - self.x_dot
-        #     * self.theta_ddot
-        #     * -1
-        #     * bike.inertia
-        #     / 2
-        #     / (bike.front_length + bike.rear_length)
-        #     / bike.front_corner_stiff
-        # ) / (
-        #     (self.local_y_dot + (bike.front_length + bike.rear_length) * self.theta_dot)
-        #     * self.theta_ddot
-        #     * -1
-        #     * bike.inertia
-        #     / 2
-        #     / (bike.front_length + bike.rear_length)
-        #     / bike.front_corner_stiff
-        #     + self.x_dot
-        # )
-
-        # delta = nsolve(
-        #     (self.eqn.subs(self.t, time)),
-        #     (self.delta),
-        #     (delta_0.subs(self.t, time).evalf()),
-        # )
-
-        # self.states.append(delta)
-
-        # return Input(
-        #     delta_dot=(self.states[-1] - self.states[-2]) / self.time_step,
-        #     a=self.a.subs(self.t, time).evalf(),
-        # )
-
         result = nsolve(
             (
                 self.eqn1.subs(
