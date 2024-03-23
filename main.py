@@ -148,7 +148,7 @@ def main(args=None):
 
         time_multiple += 1
 
-    simulation.plot(animate=False, show=True, x_func=x_func, y_func=y_func)
+    # simulation.plot(animate=False, show=True, x_func=x_func, y_func=y_func)
 
     # lam_x = lambdify(t, x_func, modules=["numpy"])
     # lam_y = lambdify(t, y_func, modules=["numpy"])
