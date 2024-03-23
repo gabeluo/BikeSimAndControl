@@ -79,87 +79,9 @@ class KinematicOLController(OLController):
         )
 
 
-class DynamicOLController_alternate(OLController):
+class DynamicOLController(OLController):
     def __init__(self, bike, time_step):
-        super().__init__(time_step)
-
-        self.delta = Symbol("delta")
-
-        print("Dynamic sim open loop controller functions:")
-
-        # Currently given in the inertia frame of reference, NOT global
-        self.x = self.t
-        print("x:", self.x)
-
-        self.x_dot = diff(self.x)
-        print("x_dot", self.x_dot)
-
-        self.x_ddot = diff(self.x_dot)
-        print("x_ddot", self.x_ddot)
-
-        self.y = sin(self.t)
-        print("y:", self.y)
-
-        self.y_dot = diff(self.y)
-        print("y_dot", self.y_dot)
-
-        self.y_ddot = diff(self.y_dot)
-        print("y_ddot:", self.y_ddot)
-
-        self.initial_theta = atan2(self.y_dot, self.x_dot)
-        self.initial_theta_dot = diff(self.initial_theta)
-
-        self.theta = atan2(self.y_dot, self.x_dot)
-        print("theta:", self.theta)
-
-        self.theta_dot = diff(self.theta)
-        print("theta_dot:", self.theta_dot)
-
-        self.theta_ddot = diff(self.theta_dot)
-        print("theta_ddot", self.theta_ddot)
-
-        self.local_x_dot = cos(self.theta) * self.x_dot + sin(self.theta) * self.y_dot
-        self.local_y_dot = -sin(self.theta) * self.x_dot + cos(self.theta) * self.y_dot
-
-        alpha_f = atan2(
-            (self.local_y_dot + (bike.front_length + bike.rear_length) * self.theta_dot)
-            * cos(self.delta)
-            - self.x_dot * sin(self.delta),
-            (
-                (
-                    self.local_y_dot
-                    + (bike.front_length + bike.rear_length) * self.theta_dot
-                )
-                * sin(self.delta)
-                + self.x_dot * cos(self.delta)
-            ),
-        )
-        alpha_r = atan2(self.local_y_dot, self.local_x_dot)
-
-        self.local_x_ddot = self.theta_dot * self.local_y_dot
-        self.local_y_ddot = (
-            -self.theta_dot * self.local_x_dot
-            + 2 / bike.mass * (-1 * bike.front_corner_stiff * alpha_f) * cos(self.delta)
-            + bike.rear_corner_stiff * alpha_r
-        )
-
-        self.a = (
-            self.x_ddot
-            - cos(self.theta) * self.local_x_ddot
-            + -1 * sin(self.theta) * self.theta_dot * self.local_x_dot
-        ) / cos(self.theta)
-
-        self.eqn = (
-            alpha_f * cos(self.delta)
-            - self.theta_ddot
-            * -1
-            * bike.inertia
-            / 2
-            / (bike.front_length + bike.rear_length)
-            / bike.front_corner_stiff
-        )
-
-        self.states = [0]
+        pass
 
     def find_initial_vals(self):
         psi = self.initial_theta.subs(self.t, 0).evalf() if self.initial_theta else 0
